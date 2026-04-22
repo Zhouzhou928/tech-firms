@@ -3,103 +3,80 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 
-st.set_page_config(page_title="Advanced Financial Dashboard", layout="wide")
+st.set_page_config(page_title="Track4 Dashboard", layout="wide")
+st.title("Tech Industry Financial Analysis (5 Companies)")
+st.subheader("Data Source: WRDS Compustat 2015-2023")
 
 # ----------------------
+#  Load Data
 # ----------------------
-st.title("📊 Advanced Financial Comparison Dashboard")
-st.subheader("AAPL vs MSFT: Interactive Financial Analysis")
+df = pd.read_csv("tech_finance_5firms.csv")
 
 # ----------------------
+#  Sidebar
 # ----------------------
-df_aapl = pd.read_csv("data_aapl.csv")
-df_msft = pd.read_csv("data_msft.csv")
+st.sidebar.header("Control Panel")
+companies = st.sidebar.multiselect(
+    "Select Companies",
+    df["tic"].unique(),
+    default=["AAPL", "MSFT", "INDUSTRY"]
+)
 
-# ----------------------
-# ----------------------
-st.sidebar.header("Portfolio Weights")
-weight_aapl = st.sidebar.slider("AAPL Weight (%)", 0, 100, 50, 1)
-weight_msft = 100 - weight_aapl
-st.sidebar.metric("MSFT Weight (%)", weight_msft)
+year_range = st.sidebar.slider(
+    "Year Range",
+    2015, 2023, (2015, 2023)
+)
 
-# ----------------------
-# ----------------------
-st.sidebar.header("Metric Selection")
-selected_metrics = st.sidebar.multiselect(
-    "Choose Metrics to Display",
-    ["net_profit_margin", "debt_asset_ratio", "asset_turnover", "roe", "current_ratio"],
-    default=["net_profit_margin", "roe"]
+indicator = st.sidebar.selectbox(
+    "Select Indicator",
+    ["profit_margin", "roe", "roa", "revt", "debt_asset"]
 )
 
 # ----------------------
+#  Filter Data
 # ----------------------
-latest_year = max(df_aapl['year'])
-aapl_latest = df_aapl[df_aapl['year'] == latest_year].iloc[0]
-msft_latest = df_msft[df_msft['year'] == latest_year].iloc[0]
-
-weighted_margin = (aapl_latest['net_profit_margin'] * weight_aapl + msft_latest['net_profit_margin'] * weight_msft) / 100
-weighted_debt = (aapl_latest['debt_asset_ratio'] * weight_aapl + msft_latest['debt_asset_ratio'] * weight_msft) / 100
-weighted_roe = (aapl_latest['roe'] * weight_aapl + msft_latest['roe'] * weight_msft) / 100
-
-# ----------------------
-# ----------------------
-col1, col2, col3 = st.columns(3)
-with col1:
-    st.metric("Weighted Net Profit Margin", f"{weighted_margin:.1f}%")
-with col2:
-    st.metric("Weighted Debt-to-Asset Ratio", f"{weighted_debt:.1f}%")
-with col3:
-    st.metric("Weighted ROE", f"{weighted_roe:.1f}%")
+filt = df[
+    (df["tic"].isin(companies)) &
+    (df["year"] >= year_range[0]) &
+    (df["year"] <= year_range[1])
+]
 
 # ----------------------
+#  Table
 # ----------------------
-st.subheader("📈 Financial Trend Comparison")
-fig, ax = plt.subplots(figsize=(12, 6))
-for metric in selected_metrics:
-    ax.plot(df_aapl['year'], df_aapl[metric], marker='o', label=f"AAPL {metric}")
-    ax.plot(df_msft['year'], df_msft[metric], marker='s', label=f"MSFT {metric}")
-ax.set_title("Financial Metrics Trend (2015-2023)")
-ax.set_xlabel("Year")
-ax.set_ylabel("Value")
-ax.legend()
-ax.grid(True, alpha=0.3)
-st.pyplot(fig)
+st.subheader("Data Table")
+st.dataframe(filt.round(2), use_container_width=True)
 
 # ----------------------
+#  Line Chart
 # ----------------------
-st.subheader("⚡ Efficiency vs Profitability")
-fig2, ax2 = plt.subplots(figsize=(8, 6))
-ax2.scatter(df_aapl['asset_turnover'], df_aapl['net_profit_margin'], color='blue', label='AAPL', s=80, alpha=0.7)
-ax2.scatter(df_msft['asset_turnover'], df_msft['net_profit_margin'], color='orange', label='MSFT', s=80, alpha=0.7)
-
-combined_turnover = (aapl_latest['asset_turnover'] * weight_aapl + msft_latest['asset_turnover'] * weight_msft) / 100
-combined_margin = (aapl_latest['net_profit_margin'] * weight_aapl + msft_latest['net_profit_margin'] * weight_msft) / 100
-ax2.scatter(combined_turnover, combined_margin, color='green', label='Weighted Portfolio', s=120, marker='*')
-ax2.set_xlabel("Asset Turnover")
-ax2.set_ylabel("Net Profit Margin (%)")
-ax2.set_title("Efficiency vs Profitability with Weighted Portfolio")
-ax2.legend()
-ax2.grid(True, alpha=0.3)
-st.pyplot(fig2)
+st.subheader("Trend Chart")
+fig1 = px.line(filt, x="year", y=indicator, color="tic", markers=True)
+st.plotly_chart(fig1, use_container_width=True)
 
 # ----------------------
+#  Scatter Plot
 # ----------------------
-st.subheader("📊 Annual Revenue Comparison")
-selected_year = st.selectbox("Select Year", sorted(df_aapl['year'].unique()))
-aapl_rev = df_aapl[df_aapl['year'] == selected_year]['revenue'].values[0]
-msft_rev = df_msft[df_msft['year'] == selected_year]['revenue'].values[0]
-
-fig3, ax3 = plt.subplots(figsize=(6, 4))
-ax3.bar(['AAPL', 'MSFT'], [aapl_rev, msft_rev], color=['blue', 'orange'])
-ax3.set_title(f"Revenue Comparison: {selected_year}")
-ax3.set_ylabel("Revenue (USD)")
-st.pyplot(fig3)
+st.subheader("ROE vs Profit Margin")
+fig2 = px.scatter(filt, x="roe", y="profit_margin", color="tic", size="revt")
+st.plotly_chart(fig2, use_container_width=True)
 
 # ----------------------
+#  Radar Chart
 # ----------------------
-st.subheader("📋 Raw Financial Data")
-col1, col2 = st.columns(2)
-with col1:
-    st.dataframe(df_aapl[['year'] + selected_metrics].round(2))
-with col2:
-    st.dataframe(df_msft[['year'] + selected_metrics].round(2))
+st.subheader("2023 Financial Radar")
+latest = df[df["year"] == 2023]
+rad_comp = st.multiselect("Compare Radar", latest["tic"].unique(), default=["AAPL", "MSFT"])
+rad_data = latest[latest["tic"].isin(rad_comp)]
+
+fig3 = go.Figure()
+for _, r in rad_data.iterrows():
+    fig3.add_trace(go.Scatterpolar(
+        r=[r.profit_margin, r.roe, r.roa, 100 - r.debt_asset],
+        theta=["Profit Margin", "ROE", "ROA", "Low Debt"],
+        fill="toself", name=r.tic
+    ))
+
+st.plotly_chart(fig3, use_container_width=True)
+
+st.success("✅ All data from WRDS | Interactive Dashboard | ACC102 Track4")
