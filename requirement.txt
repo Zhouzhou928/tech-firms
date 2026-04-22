@@ -1,5 +1,5 @@
-wrds
+streamlit
 pandas
 numpy
 plotly
-streamlit
+wrds
